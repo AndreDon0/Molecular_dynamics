@@ -1,0 +1,12 @@
+[project]
+name = "molecular-dynamics"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.3",
+    "pandas>=3.0.6",
+    "scipy>=1.18.1",
+    "tqdm>=4.70.1",
+]
