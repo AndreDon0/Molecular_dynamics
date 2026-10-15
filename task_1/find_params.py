@@ -4,6 +4,8 @@ from scipy.integrate import quad
 from scipy.optimize import least_squares
 from tqdm import tqdm
 
+from data.utils import load_data
+
 R = 8.314462618          # J / (mol K)
 N_A = 6.02214076e23      # 1 / mol
 J_TO_KCAL = 1 / 4184
@@ -182,81 +184,12 @@ def fit_LJ(B2_data,
 
 
 # ============================================================
-# 5. Example usage
+# 5. Load data and fit parameters
 # ============================================================
 
-if __name__ == "__main__":
-    from pathlib import Path
+def main():
 
-    M_F2 = 37.9968       # g/mol
-    ATM_TO_PA = 101325.0
-
-    folder = Path("task_1/data/fluorine")
-
-    # ----------------------------------------
-    # Read all NIST files
-    # ----------------------------------------
-
-    frames = []
-
-    files = [file for file in folder.iterdir() if file.is_file()]
-    for file in tqdm(files, desc="Loading NIST files", unit="file"):
-
-        try:
-            temp_df = pd.read_csv(file, sep="\t")
-            frames.append(temp_df)
-        except Exception as e:
-            tqdm.write(f"Could not load {file.name}: {e}")
-
-    df = pd.concat(
-        frames,
-        ignore_index=True
-    )
-
-
-    # ----------------------------------------
-    # Convert NIST units
-    # ----------------------------------------
-
-    df["T_K"] = df["Temperature (K)"]
-
-    df["P_Pa"] = (
-        df["Pressure (atm)"]
-        * ATM_TO_PA
-    )
-
-    df["rho_mol_m3"] = (
-        df["Density (g/ml)"]
-        * 1e6
-        / M_F2
-    )
-
-
-    # ----------------------------------------
-    # Keep only valid data
-    # ----------------------------------------
-
-    df = df[
-        np.isfinite(df["T_K"])
-        & np.isfinite(df["P_Pa"])
-        & np.isfinite(df["rho_mol_m3"])
-    ]
-
-    df = df[
-        (df["P_Pa"] > 0)
-        & (df["rho_mol_m3"] > 0)
-    ]
-
-
-    # Optionally keep only gas/vapor phase
-    if "Phase" in df.columns:
-        df = df[
-            df["Phase"]
-            .astype(str)
-            .str.lower()
-            .isin(["vapor", "gas"])
-        ]
-
+    df = load_data()
 
     # ----------------------------------------
     # Calculate experimental B2
@@ -273,12 +206,12 @@ if __name__ == "__main__":
     # Fit Lennard-Jones parameters
     # ----------------------------------------
 
-    epsilon, sigma, result = fit_LJ(
+    return fit_LJ(
         B2_data,
         epsilon_initial=0.2,
         sigma_initial=3.5
     )
 
-    print("\nLennard-Jones parameters:")
-    print(f"epsilon = {epsilon:.6f} kcal/mol")
-    print(f"sigma   = {sigma:.6f} AngsPhasestrom")
+
+if __name__ == "__main__":
+    main()

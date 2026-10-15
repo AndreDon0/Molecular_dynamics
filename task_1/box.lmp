@@ -1,0 +1,65 @@
+# ONE POINT of an isotherm: prescribe temperature and pressure, measure density.
+# Output files are saved in data/runs/ inside LAMMPS's current working directory.
+# In the terminal, -var T 120 -var P 10 can override the settings below.
+
+# 1. SETTINGS TO CHANGE FIRST
+variable T index 100             # target temperature, kelvin
+variable P index 1               # target pressure, atmospheres
+variable cells index 5           # cells along each edge; particle count = 4*cells^3
+variable seed index 35709        # random seed for initial velocities
+variable eq_steps index 20000    # starting equilibration length; check the log
+variable sample_steps index 100000 # starting measurement length; check block averages
+
+# 2. UNITS AND PARTICLES
+units real                      # angstrom, femtosecond, kelvin, atmosphere, kcal/mol
+dimension 3
+atom_style atomic               # one simple LJ particle represents one F2 molecule
+boundary p p p                  # a particle leaving one face re-enters the opposite face
+
+variable N equal 4*v_cells^3
+variable output string data/runs/T${T}_P${P}_N${N}_seed${seed}
+shell mkdir data/runs           # create the output folder before opening any files
+log ${output}.log
+
+# 3. INITIAL BOX AND POSITIONS
+# Estimate an initial volume using the ideal gas equation V = N*kB*T/P.
+# The 1e30 factor converts cubic metres to cubic angstroms.
+# NPT will subsequently change this volume; the estimate is only a starting point.
+variable L equal (v_N*1.380649e-23*v_T/(v_P*101325)*1.0e30)^(1.0/3.0)
+variable a equal v_L/v_cells
+lattice fcc ${a}                 # four particles per cubic cell, initially separated
+region bx block 0 ${L} 0 ${L} 0 ${L} units box
+create_box 1 bx                  # one particle type
+create_atoms 1 box
+mass 1 37.9968                  # F2 molar mass, g/mol
+
+# 4. INTERACTION: particles attract at moderate distance and repel when too close.
+pair_style lj/cut 11.2274        # cutoff = 11.2274 angstrom, approximately 2.5*sigma
+pair_coeff 1 1 0.149507 4.490977 # epsilon in kcal/mol; sigma in angstrom
+neighbor 2.0 bin                # extra margin for the list of interacting neighbours
+neigh_modify every 1 delay 0 check yes
+
+# 5. MOTION: initialize velocities, then integrate Newton's equations.
+velocity all create ${T} ${seed} mom yes dist gaussian
+timestep 1.0                    # each integration step is 1 femtosecond
+# NPT adjusts velocities to control temperature and box size to control pressure.
+# Equal start/end targets mean a held state. 100 and 1000 are response times in fs.
+fix bath all npt temp ${T} ${T} 100.0 iso ${P} ${P} 1000.0
+thermo 1000                     # print instantaneous measurements every 1000 steps
+thermo_style custom step atoms temp press density lx pe cpu
+
+# 6. EQUILIBRATION: let the starting arrangement relax before collecting averages.
+# For 20000 steps at 1 fs, this lasts 20 ps. This length is a trial, not a guarantee.
+run ${eq_steps}
+
+# 7. PRODUCTION: average the actual temperature, pressure, and mass density.
+variable measured_T equal temp
+variable measured_P equal press
+variable measured_rho equal density
+# Sample every 100 steps; combine 100 samples into each 10000-step block.
+# A 100000-step production run writes ten block averages.
+fix blocks all ave/time 100 100 10000 v_measured_T v_measured_P v_measured_rho file ${output}.blocks.dat
+run ${sample_steps}
+
+# Save final positions and box dimensions for inspection or a later continuation.
+write_data ${output}.data
