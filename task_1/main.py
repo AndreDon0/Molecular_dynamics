@@ -128,7 +128,7 @@ def _(cells, load_data, pd, product, run_boxes):
         return df
 
     _temperatures = [120, 144, 160]
-    _pressures = [1, 2, 3, 4, 5, 6, 8, 10]
+    _pressures = [1, 2, 3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 30, 35, 40, 45, 50]
     _cellses = [cells]
 
     df_simulated = run_boxes(_temperatures, _pressures, _cellses)
@@ -137,7 +137,7 @@ def _(cells, load_data, pd, product, run_boxes):
     return df_ideal, df_real, df_simulated
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(df_ideal, df_real, df_simulated, mo, plt):
     # Average the time blocks to obtain one point per simulation.
     _points = df_simulated.groupby("file", as_index=False)[["P", "rho"]].mean()
@@ -149,15 +149,68 @@ def _(df_ideal, df_real, df_simulated, mo, plt):
         _group = _group.sort_values("P")
         _real = df_real[df_real["T_K"] == _T].sort_values("Pressure (atm)")
         _ideal = df_ideal[df_ideal["temperature"] == _T].sort_values("pressure")
-        _ax.plot(_group["rho"], _group["P"], "o-", color=_color, label=f"{_T:g} K · simulated")
-        _ax.plot(_real["Density (g/ml)"], _real["Pressure (atm)"], "s--", color=_color,
+        _ax.plot(_group["P"], _group["rho"], "o-", color=_color, label=f"{_T:g} K · simulated")
+        _ax.plot(_real["Pressure (atm)"], _real["Density (g/ml)"], "s--", color=_color,
                  markersize=4, markerfacecolor="none", label=f"{_T:g} K · NIST")
-        _ax.plot(_ideal["density"], _ideal["pressure"], ":", color=_color, label=f"{_T:g} K · ideal")
+        _ax.plot(_ideal["pressure"], _ideal["density"], ":", color=_color, label=f"{_T:g} K · ideal")
     _ax.set(title="Isotherms: simulation, NIST and ideal gas",
-            xlabel="Density ρ (g/ml)", ylabel="Pressure P (atm)")
+            xlabel="Pressure P (atm)", ylabel="Density ρ (g/ml)")
     _ax.grid(True, alpha=0.3)
     _ax.legend(ncols=3, fontsize=8, loc="upper left")
     mo.mpl.interactive(_fig)
+    return
+
+
+@app.cell(hide_code=True)
+def _(df_ideal, df_real, df_simulated, mo, plt):
+    # Compare mean densities at matching target temperatures and pressures.
+    _points = df_simulated.groupby("file")["rho"].mean().to_frame("rho_md")
+    _points[["temperature", "pressure"]] = (
+        _points.index.to_series()
+        .str.extract(r"^T([^_]+)_P([^_]+)_")
+        .astype(float)
+    )
+
+    _nist = df_real.rename(columns={
+        "T_K": "temperature",
+        "Pressure (atm)": "pressure",
+        "Density (g/ml)": "rho_nist",
+    })
+    _ideal = df_ideal.rename(columns={"density": "rho_ideal"})
+    _keys = ["temperature", "pressure"]
+
+    _comparison = (
+        _points.reset_index(drop=True)
+        .merge(_nist[_keys + ["rho_nist"]], on=_keys,
+               how="left", validate="one_to_one")
+        .merge(_ideal, on=_keys, how="left", validate="one_to_one")
+        .sort_values(_keys)
+    )
+
+    for _model in ["md", "ideal"]:
+        _comparison[f"{_model}_error_%"] = (
+            100 * (_comparison[f"rho_{_model}"]
+                   / _comparison["rho_nist"] - 1).abs()
+        )
+
+    _groups = _comparison.groupby("temperature")
+    _fig, _axes = plt.subplots(1, len(_groups), figsize=(10, 3.8),
+                               sharey=True, squeeze=False, layout="constrained")
+    for _ax, (_T, _group) in zip(_axes.flat, _groups):
+        # Missing references stay NaN, so no error is invented for those states.
+        _ax.plot(_group["pressure"], _group["md_error_%"], "o-", label="Lennard-Jones")
+        _ax.plot(_group["pressure"], _group["ideal_error_%"], "s--", label="Ideal gas")
+        _ax.set(title=f"{_T:g} K", xlabel="Pressure P (atm)")
+        _ax.grid(True, alpha=0.3)
+    _axes[0, 0].set(ylabel="Absolute density error (%)", ylim=(0, None))
+    _axes[0, 0].legend(fontsize=8)
+    _fig.suptitle("Density errors relative to NIST")
+
+    mo.vstack([
+        mo.mpl.interactive(_fig),
+        mo.md("Errors use matching target temperatures and pressures. "
+              "States without a matching NIST gas/vapor reference have no error point."),
+    ])
     return
 
 
