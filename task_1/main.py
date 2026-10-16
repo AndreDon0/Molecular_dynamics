@@ -208,8 +208,6 @@ def _(df_ideal, df_real, df_simulated, mo, plt):
 
     mo.vstack([
         mo.mpl.interactive(_fig),
-        mo.md("Errors use matching target temperatures and pressures. "
-              "States without a matching NIST gas/vapor reference have no error point."),
     ])
     return
 
