@@ -1,0 +1,21 @@
+# Higthly recommend to use LLM for code review and analyze
+# SC - Simple cube. 1 atom, 6 neighbours
+# BCC - Body centred cube. 2 atoms, 8 neighbours
+# FCC = Face centred cube. 4 atoms, 12 neighbours
+
+units metal
+dimension 3
+boundary p p p
+
+neighbor 6 bin
+
+atom_style atomic
+lattice bcc 5                  # Body centred cube
+region box block 0 5 0 5 0 5
+create_box 1 box
+
+create_atoms 1 box
+mass 1 100
+pair_style none
+
+write_data bcc.dat

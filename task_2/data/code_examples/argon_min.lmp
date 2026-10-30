@@ -1,0 +1,28 @@
+# Higthly recommend to use LLM for code review and analyze
+# Using Leonard-Jones's potential simulate cristal of argon
+# Argon is fcc's type cristal
+
+units metal
+dimension 3
+boundary p p p
+
+neighbor 6 bin
+
+atom_style atomic
+lattice fcc 6.0               # For L-J equals sigma * 2^(2/3)
+region box block 0 5 0 5 0 5
+create_box 1 box
+
+create_atoms 1 box
+mass 1 100
+pair_style lj/cut 10
+pair_coeff 1 1 0.0103 3.4     # Epsilon, sigma
+
+variable eatom equal pe/atoms # Comparation of theoretical ammount with practical
+run 0
+print "E/N = ${eatom}"
+fix relax all box/relax iso 0.0 vmax 0.01
+min_style cg
+minimize 0.0 1.0e-6 1000 10000
+
+write_data argon_min.dat
