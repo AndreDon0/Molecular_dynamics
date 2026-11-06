@@ -1,0 +1,31 @@
+# Looking at vaporing of copper
+
+units metal
+dimension 3
+boundary p p p
+
+neighbor 6 bin
+
+atom_style atomic
+lattice fcc 3.62
+
+region box block 0 5 0 5 0 5
+create_box 1 box
+
+create_atoms 1 box
+mass 1 63.546
+pair_style eam/alloy
+pair_coeff * * ./Cu_EAMX.eamalloy Cu
+
+variable eatom equal pe/atoms
+
+run 0
+print "E/N = ${eatom}"
+
+fix npt all npt temp 300 15000 0.1 iso 1 1 1
+velocity all create 300 54643
+thermo 100
+run 50000
+print "E/N = ${eatom}"
+
+write_data cu_to_gas.dat
