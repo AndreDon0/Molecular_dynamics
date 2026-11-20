@@ -1,0 +1,22 @@
+# Cooling of fluid of Cu
+
+units metal
+read_data Cu_melt.dat
+pair_style eam/alloy
+pair_coeff * * ./Cu_EAMX.eamalloy Cu
+
+thermo 100
+dump trj all custom 100 coord_cooling.*.lammpstrj id type x y z
+
+fix npt all npt temp 2000 800 0.1 iso 1 1 1
+run 50000
+
+unfix npt
+fix npt all npt temp 800 800 0.1 iso 1 1 1
+run 150000
+
+unfix npt
+fix npt all npt temp 800 300 0.1 iso 1 1 1
+run 50000
+
+write_data Cu_cooling_fluid.dat

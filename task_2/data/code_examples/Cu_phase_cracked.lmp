@@ -1,0 +1,13 @@
+# Looking at melting point of copper 
+# Melting point 1300 K as theory
+
+units metal
+read_data Cu.dat
+pair_style eam/alloy
+pair_coeff * * ./Cu_EAMX.eamalloy Cu
+
+fix npt all npt temp 300 2000 0.1 iso 1 1 1
+velocity all create 300 54643
+thermo 100
+dump trj all custom 1000 coord_cooling.*.lammpstrj id type x y z
+run 200000
